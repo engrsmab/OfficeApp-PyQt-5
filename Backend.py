@@ -5,8 +5,7 @@ from utils.ApplyQuery import Query
 from datetime import date
 import math,json,random,sys
 from Files.Img.imgs_ import *
-from utils.yes_no_dialogue_ import Ui_Dialog_yes
-from utils.ok_dialogue_ import Ui_Dialog_ok
+
 def Validate_Submit(entries):
     error = 0
     for i in range(len(entries)):
@@ -293,7 +292,7 @@ def search_engine(value,match):
 
 def update_lists(fields,table):
     # Matching Firms name in database
-    firms = [fields[2].get(),fields[3].get(),fields[4].get()]
+    firms = [fields[1].currentText(),fields[3].currentText(),fields[4].currentText()]
     ans = Query(Firms_List_Table,col=Firms_List_Table['columns'],query=SELECT)
     for name in firms:
         result = False
@@ -311,44 +310,44 @@ def update_lists(fields,table):
         result = False
         if ans:
             for rows in ans:
-                result = search_engine(rows[0],str(item[1]))
-                if result == True and str(item[5]) == rows[2] and rows[3] == str(item[4]):
+                result = search_engine(rows[0],str(item[0]))
+                if result == True and str(item[4]) == rows[2] and rows[3] == str(item[3]):
                    break
         if result == False:
-                 Query(Item_List_Table,col=Item_List_Table['columns'],query=INSERT,value=[str(item[1]),str(item[2]),str(item[5]),str(item[4]),str(fields[7].get())])
+                 Query(Item_List_Table,col=Item_List_Table['columns'],query=INSERT,value=[str(item[0]),str(item[1]),str(item[4]),str(item[3]),str(fields[5].currentText())])
     
     # Matching Department Name in database
-    ans = Query(Depart_List_Table,col=Depart_List_Table['columns'],query=SELECT,where=['Department_List'],value=[fields[0].get()])
+    ans = Query(Depart_List_Table,col=Depart_List_Table['columns'],query=SELECT,where=['Department_List'],value=[fields[0].currentText()])
     result = False
     if ans:
         for rows in ans:
-            result = search_engine(rows[0],fields[0].get())
+            result = search_engine(rows[0],fields[0].currentText())
             if result:
                    break
     if result == False:
-            Query(Depart_List_Table,col=Depart_List_Table['columns'],query=INSERT,value=[fields[0].get()])
+            Query(Depart_List_Table,col=Depart_List_Table['columns'],query=INSERT,value=[fields[0].currentText()])
     
     # Matching Subject in database
     sub = Query(Subject_List_Table,col=Subject_List_Table['columns'],query=SELECT)
     result = False
     if sub:
         for rows in sub:
-           result = search_engine(rows[0],fields[3].get())
+           result = search_engine(rows[0],fields[2].currentText())
            if result:
                break
     if result == False:
-            Query(Subject_List_Table,col=Subject_List_Table['columns'],query=INSERT,value=[fields[3].get()])
+            Query(Subject_List_Table,col=Subject_List_Table['columns'],query=INSERT,value=[fields[2].currentText()])
 
     # Matching Unit in database
     unit = Query(Unit_List_Table,col=Unit_List_Table['columns'],query=SELECT)
     result = False
     if unit:
         for rows in unit:
-            result = search_engine(rows[0],item[2])
+            result = search_engine(rows[0],item[3])
             if result:
                 break
     if result == False:
-            Query(Unit_List_Table,col=Unit_List_Table['columns'],query=INSERT,value=[item[2]])
+            Query(Unit_List_Table,col=Unit_List_Table['columns'],query=INSERT,value=[item[3]])
     
     # Inserting data into Specification database
     specs = Query(specs_List_Table,col=specs_List_Table['columns'],query=SELECT)
@@ -356,11 +355,11 @@ def update_lists(fields,table):
         result = False
         if specs:
             for rows in specs:
-                result = search_engine(rows[0],item[2])
+                result = search_engine(rows[0],item[1])
                 if result:
                     break
         if result == False:
-            Query(specs_List_Table,col=specs_List_Table['columns'],query=INSERT,value=[str(item[2])])
+            Query(specs_List_Table,col=specs_List_Table['columns'],query=INSERT,value=[str(item[1])])
 def set_directories(folder,path = None):
     if  path == None:
         paths = Query(files_path,col=files_path['columns'],query=SELECT)
@@ -436,10 +435,10 @@ def Validate_Print(fields,print_mode,comparator):
     error1 = 0
     error2 = 0
     for i in range(len(fields)):
-        digit,char = Validate(fields[i].get())
-        if (i == 0 or i == 2 or i == 3) and ((digit == True and char == False) or (digit == False and char == False)):
+        digit,char = Validate(fields[i].currentText())
+        if (i == 0 or i == 1 or i == 2) and ((digit == True and char == False) or (digit == False and char == False)):
             error1 = 1
-        elif (i == 5 or i == 4) and comparator == True and ((digit == True and char == False) or (digit == False and char == False)):
+        elif (i == 3 or i == 4) and comparator == True and ((digit == True and char == False) or (digit == False and char == False)):
             error2 = 1
     if error1 == 0:
         if len(print_mode) == 1 and print_mode[0] == "Demand":
@@ -447,10 +446,10 @@ def Validate_Print(fields,print_mode,comparator):
         if error2 == 0:
             return "All",error1
         else:
-            messagebox.showerror("Invalid Entries","Please Enter correct Department/Firm/Subject/Comparators")
+            error_dialog("Invalid Entries","Please Enter correct Department/Firm/Subject/Comparators","")
             return "None",1
     else:
-        messagebox.showerror("Invalid Entries","Please Enter correct Department/Firm/Subject")
+        error_dialog("Invalid Entries","Please Enter correct Department/Firm/Subject","")
         return "None",error1
 def Create_Tables():
     for table in tables:
@@ -465,13 +464,13 @@ def Save_Bills(fields,table,diary,group,prints,limit,status,cheque_no):
     if not ans:
         update_lists(fields,table)
         Date,Time = Today_Date()
-        v = [str(Date),diary,fields[3].get(),fields[0].get(),fields[2].get(),fields[4].get(),fields[5].get(),fields[7].get(),group,limit,status,cheque_no]
+        v = [str(Date),diary,fields[2].currentText(),fields[0].currentText(),fields[1].currentText(),fields[3].currentText(),fields[4].currentText(),fields[5].currentText(),group,limit,status,cheque_no]
         print(v)
         Query(Bills_Table,col=Bills_Table['columns'],query=INSERT,value=v)
         for i in table:
-            tax = str(i[7]).split("(")[1]
+            tax = str(i[6]).split("(")[1]
             tax = tax.split(")")[0]
-            data = [diary,i[1],i[2],i[3],i[4],tax,i[9],i[10],""]
+            data = [diary,i[0],i[1],i[2],i[3],i[4],tax,i[8],i[9],""]
             print(data)
             Query(Bill_Items_Table,col=Bill_Items_Table['columns'],query=INSERT,value=data)
         selected_prints = ""
@@ -631,3 +630,16 @@ def update_proceed(data,client_data,radio_btns):
     # else:
     #     Query(client_side_table,col=client_side_table['columns'],query=INSERT,value=[data[1],client_data[0].get(),client_data[1].get()])
     # Query(Bills_Table,col=['Cheque_No'],query=UPDATE,where=['Diary_No'],value=[client_data[2].get(),data[1]])
+def check_version(version):
+    v = Query(version_table,col=version_table['columns'],query=SELECT)
+    if v:
+        print(v[0][1])
+        if v[0][1] == version:
+            return None
+        else:
+            Query(version_table,col=['Version'],query=UPDATE,where=['Sr'],value=[str(version),"1"])
+            return "update"
+    else:
+        Query(version_table,col=version_table['columns'],query=INSERT,value=["1",version])
+        print("Inserted")
+        return None
