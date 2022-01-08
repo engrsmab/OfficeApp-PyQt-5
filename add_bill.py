@@ -3,12 +3,14 @@ import Python_Files.Backend as Backend
 from utils.Databases import SELECT, UPDATE
 from Python_Files.Requirments import *
 from Python_Files.add_bill_py_ import Ui_add_bill
-from utils.Qt_Dialogues import error_dialog,ask_dialog
+from utils.Qt_Dialogues import error_dialog,ask_dialog,info_dialog
 from PyQt5 import QtWidgets,QtCore,QtGui
+
 from PyQt5.QtWidgets import QGraphicsDropShadowEffect 
 from PyQt5.Qt import Qt
 class Add_Bill:
     def __init__(self,window) -> None:
+        self.manage_bill = False
         self.main_window = window
         self.Diary_No = Backend.Diary_No(SELECT,"100100")
         
@@ -16,8 +18,8 @@ class Add_Bill:
         self.no_bills = 1
         self.total_list = []
         self.New_Bill_Window = Ui_add_bill()
-        self.New_Bill_Window.setupUi(window)
-
+        self.New_Bill_Window.setupUi()
+        self.New_Bill_Window.show()
         self.New_Bill_Window.diary_no.setText(self.Diary_No)
         
         # Setting up manage window
@@ -28,7 +30,10 @@ class Add_Bill:
                 w = 150
             self.New_Bill_Window.manage_table.setColumnWidth(i,w)
         self.New_Bill_Window.managed_note.setText("")
-
+        
+        self.New_Bill_Window.limit_entrt.setEnabled(False)
+        self.New_Bill_Window.limit_entrt.returnPressed.connect(self.Manage_Event)
+        self.New_Bill_Window.pushButton.clicked.connect(self.delete_settings)
         # Setting up total Window
         shadow = QGraphicsDropShadowEffect()
         shadow.setBlurRadius(55)
@@ -60,147 +65,86 @@ class Add_Bill:
             if checks == 0 or checks == 3:
                 self.checkboxes[checks].toggled.connect(lambda state = self.checkboxes[checks].isChecked(),check=checks:self.table_entry.change_state(state,check))
         
-        # Setting Manage Spin
-        spin_class = Spin(self.New_Bill_Window,self.table_entry)
+        
 
-    def Printed_Documents(self,selection,print_titles):
+    def Printed_Documents(self):
         print_mode = []
         comparator = False
-        for i in range(len(selection)):
-                if selection[i].get() == 1:
+        for i in range(6):
+                if self.checkboxes[i].isChecked() == True:
                     if i != 0:
-                        if print_titles[i] == "Comparator":
+                        if i == 3 and self.checkboxes[i].isChecked() == True:
                             comparator = True
                         else:
-                           print_mode.append(print_titles[i])
+                           print_mode.append(self.checkboxes[i].text())
         return print_mode,comparator
-    def validate_table_data(self,table_data,comparator,selection):
+    def validate_table_data(self,table_data,comparator):
         error = 0
         count = 0
         for i in table_data:
-            if comparator == True and (i[9] == 0 or i[10] == 0):
+            if comparator == True and (i[9] == ("0","") or i[8] == ("0","")):
                 error = 1
-                messagebox.showerror("Invalid Entry",f"پرنٹ کرنے سے پہلے موازنہ کرنے والی فرموں کی قیمت درست کریں۔[Line {count}]")
+                error_dialog("Invalid Entry",f"پرنٹ کرنے سے پہلے موازنہ کرنے والی فرموں کی قیمت درست کریں۔[Line {count}]","")
                 return error
-            elif (selection[0].get() == 1 or selection[-1].get() == 1) and (i[7] == "" or i[7] == "0" or i[7] == "0.0 (0%)"):
+            elif (self.checkboxes[0].isChecked() == True) and (i[6] == ("","0","0.0 (0%)")):
                 error = 1
-                messagebox.showerror("Invalid Entry",f"پرنٹ کرنے سے پہلے ٹیکس کی قیمت درست کریں۔ [Line {count}]")
+                error_dialog("Invalid Entry",f"پرنٹ کرنے سے پہلے ٹیکس کی قیمت درست کریں۔ [Line {count}]","")
                 return error
             count += 1
         return error
-    def validating_selected_firms(self,fields):
-        if fields[2].get() == fields[4].get() or fields[2].get() == fields[5].get() or fields[4].get() == fields[5].get():
+    def validating_selected_firms(self):
+        if self.field_list[1].text() == self.field_list[4].text() or self.field_list[1].text() == self.field_list[3].text() or self.field_list[4].text() == self.field_list[3].text():
             error = 1
-            messagebox.showerror("Invalid Entry","برائے مہربانی فرم کا انتخاب درست کیجیئے۔ ایک فرم کو دو دفعہ استعمال نہیں کیا جا سکتا")
+            error_dialog("Invalid Entry","برائے مہربانی فرم کا انتخاب درست کیجیئے۔ ایک فرم کو دو دفعہ استعمال نہیں کیا جا سکتا","")
         else:
             error = 0
         return error
     def Save_Bill(self,button):
-        if self.table.get_children():
-            print_mode,comparator = self.Printed_Documents(self.checkboxes,self.prints)
-            table_data = fetch_table_data(self.table)
+        table_data = self.table_entry.fetch_table_data()
+        if len(table_data) > 0:
             error = 0
-            if button == "print" and len(print_mode) == 0:
-                error = 1
-                messagebox.showerror("Invalid Selection","آپ کیا پرنٹ کرنا چاہتے ہیں؟ برائے مہربانی انتخاب کیجیئے")
-            if error == 0:
-                print_status,error = Backend.Validate_Print(self.field_list,print_mode,comparator)
-            if error == 0 and button == "print":
-                error = self.validate_table_data(table_data,comparator,self.checkboxes)
-            if error == 0 and comparator == True:
-                error = self.validating_selected_firms(self.field_list)
-            if error == 0:
-                cheque_no = ""
-                status = "pending"
-                response = Backend.Save_Bills(self.field_list,table_data,self.Diary_No,"None",print_mode,str(self.limit),status,cheque_no)
-                if response == "Done" and button != "print":
-                    messagebox.showinfo("Success Notification",f"This Work has been initiated with Diary number {str(self.Diary_No)}")
-                elif button != "print":
+            for rows in range(len(table_data)):
+                if table_data[rows][0] == "" or table_data[rows][2] == "":
                     error = 1
-                    messagebox.showwarning("Data Maches","This Diary# is already registered in my database.")
-                if button == "print":
-                    Printing.printing(table_data,self.Diary_No,self.no_bills,self.qty_per_bill,print_mode,self.field_list,self.total_bill_amount,comparator,self.compare_rates)
-                    self.Print_Done_Win(print_mode,comparator,self.field_list)
+            if error == 0:
+                print_mode,comparator = self.Printed_Documents()
+                error = 0
+                if button == "print" and len(print_mode) == 0:
+                    error = 1
+                    error_dialog("Invalid Selection","آپ کیا پرنٹ کرنا چاہتے ہیں؟ برائے مہربانی انتخاب کیجیئے","")
                 if error == 0:
-                    diary = int(self.Diary_No) + 1
-                    Backend.Diary_No(UPDATE,str(diary))
-                    self.bill_root.destroy()
-                    return "Done"
-                else:
-                    return "Failed"
-        else:
-            messagebox.showerror("Invalid Attempt","There is no entry to save")
-            return "Failed"
-    def Print_Done_Win(self,print_mode,comparator,fields):
-        doneWin = Tk()
-        doneWin.geometry("500x320")
-        doneWin.title("Print Information Window")
-        done_frame = Frame(doneWin,bg=fg_color)
-        done_frame.pack(fill=BOTH,expand=1)
-        titles = ["Bills","Qoutations","Demands","Invoices","Estimate"]
-        if comparator:
-            loop = 3
-            firms = [2,4,5]
-        else:
-            loop = 1
-            firms = [2]
-        qoute = 0
-        bill = 0
-        demand = 0
-        invoice = 0
-        estimate = 0
-        for i in print_mode:
-            if i == "Quotation":
-                qoute = 1
-            elif i == "Bill":
-                bill = 1
-            elif i == "Estimate":
-                estimate = 1
-            elif i == "Invoice":
-                invoice = 1
-            elif i == "Demand":
-                demand = 1
-        qty_list = [bill,qoute,demand,invoice,estimate]
-        entry_values = [int(self.no_bills)*loop*value for value in qty_list]
-        y = 40
-        for n in range(loop):
-            firm_name = Label(done_frame,text=str(fields[firms[n]].get()),bg=fg_color,fg=light_fg,font=font)
-            firm_name.pack()
-            firm_name.place(x=20,y=y)
-            x = 150
-            count = 0
-            for i in titles:
-                title_label = Label(done_frame,text=i,bg=fg_color,fg=bg_color,font=small_font)
-                title_label.pack()
-                title_label.place(x=x,y=y-20)
-                
-                entry = Entry(done_frame,bg=fg_color,fg=light_fg,font=font,width=5)
-                entry.pack()
-                entry.place(x=x,y=y)
-                entry.insert(0,str(entry_values[count]))
-                entry['state'] = DISABLED
-                x += 100
-                count += 1
+                    print_status,error = Backend.Validate_Print(self.field_list,print_mode,comparator)
+                if error == 0 and button == "print":
+                    error = self.validate_table_data(table_data,comparator)
+                if error == 0 and comparator == True:
+                    error = self.validating_selected_firms()
+                if error == 0:
+                    cheque_no = ""
+                    status = "pending"
+                    response = Backend.Save_Bills(self.field_list,table_data,self.Diary_No,"None",print_mode,str(self.limit),status,cheque_no)
+                    if response == "Done" and button != "print":
+                        info_dialog("Success Notification",f"This Work has been initiated with Diary number {str(self.Diary_No)}","")
+                    elif button != "print":
+                        error = 1
+                        error_dialog("Data Maches","This Diary# is already registered in my database.","")
+                    if button == "print":
+                        pass
+                        #Printing.printing(table_data,self.Diary_No,self.no_bills,self.qty_per_bill,print_mode,self.field_list,self.total_bill_amount,comparator,self.compare_rates)
+                        #self.Print_Done_Win(print_mode,comparator,self.field_list)
+                    if error == 0:
+                        diary = int(self.Diary_No) + 1
+                        Backend.Diary_No(UPDATE,str(diary))
         
-
-    
-   
-class Spin(QtWidgets.QSpinBox):
-    def __init__(self,UI,table_class) -> None:
-        super().__init__()
-        self.table_entry = table_class
-        self.UI = UI
-        self.status = False
-        self.Table = self.UI.manage_table
-        self.Table.keyPressEvent = self.keyPress
-    def keyPress(self,event):
-        if event.key() == Qt.Key_Return:
-            self.Manage_Event()
-            print("Done Enter")
+                        return "Done"
+                    else:
+                        return "Failed"
+        else:
+            error_dialog("Invalid Attempt","There is no entry to save","")
+            return "Failed"
     
     def manage_done(self,table_data):
        
-        self.UI.pushButton.setEnabled(True)
+        self.New_Bill_Window.pushButton.setEnabled(True)
         data = []
         for i in range(self.no_bills):
             no = i + 1
@@ -209,7 +153,7 @@ class Spin(QtWidgets.QSpinBox):
             for item_num in self.qty_per_bill[i]:
                 if item_num != 0:
                    no_items += str(item_num)
-                   item = table_data[count][1]
+                   item = table_data[count][0]
                    items += str(item)
                 if count != len(self.qty_per_bill):
                     items += ","
@@ -221,29 +165,41 @@ class Spin(QtWidgets.QSpinBox):
 
     def Manage_Event(self):
         data = self.table_entry.fetch_table_data()
-        if len(data) > 1:
-            self.limit = self.UI.limit_spin.value()
+        if len(data) > 0:
+            self.limit = self.New_Bill_Window.limit_entrt.text()
             totals = self.table_entry.Update_Total_Label()
             digit,char = Backend.Validate(self.limit)
-            if digit == True and char == False and (self.limit != "" and int(self.limit) != 0) and int(self.limit) <= int(totals[2]):
-                self.no_bills, self.qty_per_bill,self.final_above_rates,self.total_bill_amount = Backend.Find_Required_Bills(data,int(self.limit),totals)
-                if self.no_bills != 0 and self.no_bills != "":
-                    self.manage_done(data)
+            if digit == True and char == False and (self.limit != "" and int(self.limit) != 0):
+                if int(self.limit) <= int(totals[2]):
+                    self.no_bills, self.qty_per_bill,self.final_above_rates,self.total_bill_amount = Backend.Find_Required_Bills(data,int(self.limit),totals)
+                    if self.no_bills != 0 and self.no_bills != "":
+                        self.manage_done(data)
+                    else:
+                        self.New_Bill_Window.managed_note.setText(f"This amount is not managable :( \n {self.final_above_rates[1]} is rated as Rs.{self.final_above_rates[5]} which is above Rs.{str(self.limit)}")
                 else:
-                    self.UI.managed_note.setText(f"This amount is not managable :( \n {self.final_above_rates[1]} is rated as Rs.{self.final_above_rates[5]} which is above Rs.{str(self.limit)}")
+                    info_dialog("Check Entry","اس قیمت کے لیے بل کو ٹھیک کرنے کی ضرورت نہیں ہے","")
             else:
-                error_dialog("Invalid Entery error","Please Enter a valid Number. Number should not be zero and should not greater than total amount","")
+                error_dialog("Invalid Entry","درست قیمت کا اندراج کیجئے","قیمت درست کریں")
         else:
             error_dialog("Data Error","No Items to manage this bill. Please save items first.","NOTE: FIll in above table.")
     def insert_into_manage_table(self,data):
+        self.manage_bill = True
+        self.New_Bill_Window.table.setEnabled(False)
         for rows in range(len(data)):
-           for cols in range(self.UI.manage_table.columnCount()):
+            self.New_Bill_Window.manage_table.setRowCount(rows+1)
+            self.New_Bill_Window.manage_table.setColumnCount(self.New_Bill_Window.manage_table.columnCount())
+            for cols in range(self.New_Bill_Window.manage_table.columnCount()):
                 item = QtWidgets.QLabel()
-                item.setText(data[rows][cols])
+                item.setText(str(data[rows][cols]))
                 item.setStyleSheet("color:white;\n"
                 "background-color:rgb(60, 153, 85);\n")
                 item.setAlignment(Qt.AlignCenter)
-                self.UI.manage_table.setCellWidget(rows, cols, item)
+                self.New_Bill_Window.manage_table.setCellWidget(rows, cols, item)
+    def delete_settings(self):
+        self.manage_bill = False
+        self.New_Bill_Window.table.setEnabled(True)
+        self.New_Bill_Window.manage_table.setRowCount(0)
+        
 
 class Tables(QtWidgets.QTableWidget):
     def __init__(self,UI,checkbox,fields) -> None:
@@ -336,7 +292,7 @@ class Tables(QtWidgets.QTableWidget):
         stats,final_list = Backend.New_Item_Validation(self.checkboxes,item_data)
         if stats == 0:
             
-            self.UI.limit_spin.setEnabled(True)
+            self.UI.limit_entrt.setEnabled(True)
             
             if self.Match_Record():
                 if item_data[8] != "":
@@ -490,6 +446,7 @@ class Tables(QtWidgets.QTableWidget):
     def remove_rows(self):
         model = self.model
         indices = self.Table.selectionModel().currentRow() 
+        print(indices)
         for index in sorted(indices):
             model.removeRow(index.row())
         
